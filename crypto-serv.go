@@ -10,6 +10,7 @@ import(
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net"
 	"html/template"
 	//"regexp"
 )
@@ -25,29 +26,13 @@ func main() {
 	http.HandleFunc("/save/", saveHandler)
 	http.HandleFunc("/decrypt/", decryptHandler)
 	http.ListenAndServe(":8080", nil)
-
-	/*
-	key := []byte("sssouThdaKoTa412")
-
-	plaintext := []byte("Secret Message to be encrypted!")
-	fmt.Printf("Text before encoding: %s\n", plaintext)
-	ciphertext, err := encrypt(key, plaintext)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%0x\n", ciphertext)
-	result, err := decrypt(key, ciphertext)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%s\n", result)
-	*/
 }
 
 //HTTP Index Handler
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Index page accessed\n")
-	files, _ := ioutil.ReadDir("./")
+	ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+	fmt.Printf("[+] Index page accessed by %s\n", ip)
+	files, _ := ioutil.ReadDir("./messages/")
 	fmt.Fprintf(w, "<h1>MIS 445 Crypto Go Server</h1>")
 	for _, f := range files {
 		if f.Name()[len(f.Name())-4:] == ".txt"{
@@ -59,11 +44,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 //HTTP view Handler
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("View page accessed\n")
+	ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+	fmt.Printf("[+] View page accessed by %s\n", ip)
 	title := r.URL.Path[len("/view/"):]
 	p, err := loadPage(title)
 	if err != nil {
-		fmt.Printf("Tried accessing non existant page: %s\n", r.URL.Path[1:])
+		fmt.Printf("[-] Tried accessing non existant page: %s\n", r.URL.Path[1:])
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
 		return
 	}
@@ -72,7 +58,8 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 //HTTP edit handler
 func createHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Edit page accessed\n")
+	ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+	fmt.Printf("[+] Edit page accessed by %s\n", ip)
 	title := r.URL.Path[len("/create/"):]
 	p,err := loadPage(title)
 	if err != nil {
@@ -83,7 +70,8 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 
 //HTTP save handler
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Save page accessed\n")
+	ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+	fmt.Printf("[+] Save page accessed by %s\n", ip)
 	title := r.FormValue("msg-title")
 	body, _ := encrypt([]byte(r.FormValue("init-key")), []byte(r.FormValue("body")))
 	p := &Page{Title: title, Msg: []byte(body)}
@@ -93,12 +81,18 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 
 //HTTP decrypt handler
 func decryptHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("MADE IT")
+	ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+	fmt.Printf("[+] Decrypt Page Accessed by %s\n", ip)
 	title := r.URL.Path[len("/decrypt/"):]
-	fmt.Printf("GOT TITLE")
 	p,_ := loadPage(title)
-	fmt.Printf("%s", r.FormValue("d-key"))
-	decryptedMsg, _ := decrypt([]byte(r.FormValue("d-key")), p.Msg)
+	fmt.Printf("[$] Key used: %s\n", r.FormValue("d-key"))
+	decryptedMsg, err := decrypt([]byte(r.FormValue("d-key")), p.Msg)
+	if err != nil {
+		ip,_,_ := net.SplitHostPort(r.RemoteAddr)
+		fmt.Printf("[-] Invalid key entered by %s\n", ip)
+		fmt.Fprintf(w, "<h1>Invalid key used</h1><a href='/'><button>Return Home</button></a>")
+		return
+	}
 	fmt.Fprintf(w, "<h1>Decrypted Message</h1><p>%s</p><a href='/'><button>Home</button></a>", decryptedMsg)
 
 }
@@ -120,13 +114,13 @@ type Page struct {
 //Save page 
 func (p *Page) save() error {
 	filename := p.Title + ".txt"
-	return ioutil.WriteFile(filename, p.Msg, 0600)
+	return ioutil.WriteFile("messages/" + filename, p.Msg, 0600)
 }
 
 //Load page 
 func loadPage(title string) (*Page, error) {
 	filename := title + ".txt"
-	body,err := ioutil.ReadFile(filename)
+	body,err := ioutil.ReadFile("messages/" + filename)
 	if err != nil {
 		return nil, err
 	}
@@ -137,13 +131,13 @@ func loadPage(title string) (*Page, error) {
 func encrypt(key, text []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	b := base64.StdEncoding.EncodeToString(text)
 	ciphertext := make([]byte, aes.BlockSize+len(b))
 	iv := ciphertext[:aes.BlockSize]
 	if _,err := io.ReadFull(rand.Reader, iv); err != nil {
-		panic(err)
+		return nil, err
 	}
 	cfb := cipher.NewCFBEncrypter(block, iv)
 	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(b))
@@ -154,7 +148,7 @@ func encrypt(key, text []byte) ([]byte, error) {
 func decrypt(key, text []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if len(text) < aes.BlockSize {
@@ -167,7 +161,7 @@ func decrypt(key, text []byte) ([]byte, error) {
 	cfb.XORKeyStream(text, text)
 	data, err := base64.StdEncoding.DecodeString(string(text))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return data, nil
 }
