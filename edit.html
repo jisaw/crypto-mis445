@@ -3,7 +3,7 @@
 <form action="/save/" method="POST">
 Message title:<br />
 <input type="text" name="msg-title"><br />
-Key(16/32/64 chars):<br />
+Key(16/24/32 chars):<br />
 <input type="text" name="init-key"><br />
 <div><textarea name="body" rows="20" cols="80">{{printf "%s" .Msg}}</textarea></div>
 <div><input type="submit" value="Save"></div>
