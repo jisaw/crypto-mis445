@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 )
 
 var templates = template.Must(template.ParseFiles("edit.html", "view.html", "decrypt.html"))
@@ -72,7 +73,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	fmt.Printf("[+] Save page accessed by %s\n", ip)
 	title := r.FormValue("msg-title")
-	body, _ := encrypt([]byte(r.FormValue("init-key")), []byte(r.FormValue("body")))
+	body, _ := encrypt([]byte(padKey(r.FormValue("init-key"))), []byte(r.FormValue("body")))
 	p := &Page{Title: title, Msg: []byte(body)}
 	p.save()
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
@@ -85,7 +86,7 @@ func decryptHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/decrypt/"):]
 	p, _ := loadPage(title)
 	fmt.Printf("[$] Key used: %s\n", r.FormValue("d-key"))
-	decryptedMsg, err := decrypt([]byte(r.FormValue("d-key")), p.Msg)
+	decryptedMsg, err := decrypt([]byte(padKey(r.FormValue("d-key"))), p.Msg)
 	if err != nil {
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		fmt.Printf("[-] Invalid key entered by %s\n", ip)
@@ -101,6 +102,28 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+//Ensure Key is right number of chars
+func padKey(key string) string {
+	length := len(key)
+	if length == 16 || length == 24 || length == 32 {
+		return key
+	} else if length < 16 {
+		padLen := 16 - length
+		padding := strings.Repeat("f", padLen)
+		return key + padding
+	} else if length < 24 {
+		padLen := 24 - length
+		padding := strings.Repeat("f", padLen)
+		return key + padding
+	} else if length < 32 {
+		padLen := 32 - length
+		padding := strings.Repeat("f", padLen)
+		return key + padding
+	} else {
+		return key[:32]
 	}
 }
 
