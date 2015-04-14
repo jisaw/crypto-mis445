@@ -12,7 +12,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	//"regexp"
+	"os"
 )
 
 var templates = template.Must(template.ParseFiles("edit.html", "view.html", "decrypt.html"))
@@ -24,7 +24,7 @@ func main() {
 	http.HandleFunc("/create/", createHandler)
 	http.HandleFunc("/save/", saveHandler)
 	http.HandleFunc("/decrypt/", decryptHandler)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 }
 
 //HTTP Index Handler
