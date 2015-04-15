@@ -33,7 +33,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	fmt.Printf("[+] Index page accessed by %s\n", ip)
 	files, _ := ioutil.ReadDir("./messages/")
-	fmt.Fprintf(w, "<style>body{font-family: courier;}</style><h1>MIS 445 Crypto Go Server</h1>")
+	fmt.Fprintf(w, "<style>body{font-family: courier;}</style><h1>MIS 445 Crypto Server</h1>")
 	for _, f := range files {
 		if f.Name()[len(f.Name())-4:] == ".txt" {
 			fmt.Fprintf(w, "<a href='/view/%s'>%s</a><br /><br />", f.Name()[:len(f.Name())-4], f.Name()[:len(f.Name())-4])
